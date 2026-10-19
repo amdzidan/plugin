@@ -1,0 +1,37 @@
+name: Build RVRS (Apple Silicon)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRVRS_INSTALL_AFTER_BUILD=OFF
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Package
+        run: |
+          set -e
+          VST3=$(find build -name "RVRS.vst3" -type d | head -n 1)
+          AU=$(find build -name "RVRS.component" -type d | head -n 1)
+          codesign --force --deep -s - "$VST3"
+          ditto -c -k --keepParent "$VST3" RVRS-VST3.zip
+          if [ -n "$AU" ]; then
+            codesign --force --deep -s - "$AU"
+            ditto -c -k --keepParent "$AU" RVRS-AU.zip
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RVRS-macOS-arm64
+          path: |
+            RVRS-VST3.zip
+            RVRS-AU.zip
